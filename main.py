@@ -1,7 +1,7 @@
 import requests
 import json
 
-host = "127.0.0.1:9090"
+host = "http://127.0.0.1:9090"
 
 
 def getNode(geturl):
@@ -9,13 +9,14 @@ def getNode(geturl):
     json_str = json.dumps(res, sort_keys=True)
     # 将 JSON 对象转换为 Python 字典
     params_json = json.loads(json_str)
-    items = params_json['proxies'].items()
-    node_set = set()
-    for key, value in items:
-        str_key = str(key)
-        if str_key[:2] == "V4":
-            node_set.add(str_key)
-    return node_set
+    items = params_json['proxies']['Proxy']['all']
+    now = params_json['proxies']['Proxy']['now']
+    node_set = set(items)
+    # for key, value in items:
+    #    str_key = str(key)
+    #    if str_key[:2] == "V4":
+    #        node_set.add(str_key)
+    return node_set, now
 
 
 def getTimeOut(geturl, node_set):
@@ -50,7 +51,7 @@ def postNode(geturl, result_mp):
 
 
 if __name__ == '__main__':
-    url = "http://127.0.0.1:9090/proxies"
-    node_set = getNode(url)
+    url = host + "/proxies"
+    node_set, now_node = getNode(url)
     result_map = getTimeOut(url, node_set)
     postNode(url, result_map)
