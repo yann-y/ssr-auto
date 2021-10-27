@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/zztroot/rconfig"
@@ -54,9 +55,11 @@ func getProxies(host string) *nodeList {
 	wg := sync.WaitGroup{}
 	requestUrl := "http://www.gstatic.com/generate_204"
 	nodeMap := sync.Map{}
+	ch := make(chan struct{}, 10)
 	for _, value := range getNodeList.Proxies.Proxy.All {
 		v := value
 		wg.Add(1)
+		ch <- struct{}{}
 		go func(v string) {
 			defer wg.Done()
 			requestsUrl := url + "/" + v + "/delay?" + "timeout=" + strconv.Itoa(timeout) + "&url=" + requestUrl
@@ -73,7 +76,7 @@ func getProxies(host string) *nodeList {
 				return
 			}
 			nodeMap.Store(v, temp.Delay)
-
+			<-ch
 		}(v)
 	}
 	wg.Wait()
@@ -88,9 +91,21 @@ func getProxies(host string) *nodeList {
 		return true
 	})
 	fmt.Println(minName, minDelay)
+	changeNode(url, minName)
 	return &getNodeList
 }
-
+func changeNode(url, nodeName string) {
+	url = url + "/Proxy"
+	client := &http.Client{}
+	postData := fmt.Sprintf("{\"name\":\"%s\"}", nodeName)
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte(postData)))
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	fmt.Println("status", resp.Status)
+}
 func main() {
 	files, _ := rconfig.OpenJson("./config.json")
 	name := files.GetString("host") //key
