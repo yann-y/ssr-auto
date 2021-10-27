@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/zztroot/rconfig"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
 	"sync"
+	"syscall"
+	"time"
 )
 
 type nodeList struct {
@@ -106,9 +109,53 @@ func changeNode(url, nodeName string) {
 	defer resp.Body.Close()
 	fmt.Println("status", resp.Status)
 }
+func GetFileCreateTime(path string) int64 {
+	osType := runtime.GOOS
+	fileInfo, _ := os.Stat(path)
+	if osType == "linux" {
+		statT := fileInfo.Sys().(*syscall.Stat_t)
+		tCreate := statT.Ctim.Sec
+		return tCreate
+	}
+	return time.Now().Unix()
+}
+func getClash(url string) {
+	// 比较上一次的更新时间
+	localPath := "./config.yaml"
+	t := time.Now().Unix() - GetFileCreateTime(localPath)
+	fmt.Println(t)
+	if t <= 60*60*24 {
+		log.Println("距离上一次更新配置文件太近")
+		return
+	}
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	// 打开配置问价
+	open, err := os.OpenFile("./config.yaml", os.O_CREATE|os.O_RDWR, 0766)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	_, err = io.Copy(open, resp.Body)
+	if err != nil {
+		return
+	}
+	if err != nil {
+		return
+	}
+	fmt.Printf(strconv.FormatInt(GetFileCreateTime("./config.yaml"), 10))
+}
 func main() {
-	files, _ := rconfig.OpenJson("./config.json")
-	name := files.GetString("host") //key
+	url := ""
+	getClash(url)
+	//files, _ := rconfig.OpenJson("./config.json")
+	//name := files.GetString("host") //key
 	//desc := files.GetInt("test.1.params.0.desc")  //333
-	getProxies(name)
+
+	//getProxies(name)
 }
