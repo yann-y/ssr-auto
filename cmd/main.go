@@ -1,20 +1,25 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/zztroot/rconfig"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"sync"
 	"syscall"
 	"time"
 )
+
+const filePath = "/home/yanfive/Pictures/clash/config.yaml"
 
 type nodeList struct {
 	Proxies struct {
@@ -93,7 +98,8 @@ func getProxies(host string) *nodeList {
 		}
 		return true
 	})
-	fmt.Println(minName, minDelay)
+	//fmt.Println(minName, minDelay)
+	log.Println("=====测速完成！！！=====")
 	changeNode(url, minName)
 	return &getNodeList
 }
@@ -107,7 +113,12 @@ func changeNode(url, nodeName string) {
 		return
 	}
 	defer resp.Body.Close()
-	fmt.Println("status", resp.Status)
+	status := resp.Status
+	if status == "204 No Content" {
+		log.Println("更新节点成功！！")
+		log.Println("", nodeName)
+	}
+	fmt.Println("status", status)
 }
 func GetFileCreateTime(path string) int64 {
 	osType := runtime.GOOS
@@ -119,43 +130,72 @@ func GetFileCreateTime(path string) int64 {
 	}
 	return time.Now().Unix()
 }
-func getClash(url string) {
+func getClash(url string, ok bool) {
 	// 比较上一次的更新时间
-	localPath := "./config.yaml"
+	localPath := filePath
 	t := time.Now().Unix() - GetFileCreateTime(localPath)
-	fmt.Println(t)
-	if t <= 60*60*24 {
+	if t <= 60*60*24 && ok {
 		log.Println("距离上一次更新配置文件太近")
 		return
 	}
 
 	resp, err := http.Get(url)
 	if err != nil {
+		log.Println(err)
 		return
 	}
 	defer resp.Body.Close()
 	// 打开配置问价
-	open, err := os.OpenFile("./config.yaml", os.O_CREATE|os.O_RDWR, 0766)
+	open, err := os.OpenFile(filePath, os.O_CREATE|os.O_RDWR, 0766)
 	if err != nil {
-		log.Println(err)
+		log.Println("url错误------》", err)
 		return
 	}
 
 	_, err = io.Copy(open, resp.Body)
 	if err != nil {
+		log.Println(err)
 		return
 	}
+	//fmt.Printf(strconv.FormatInt(GetFileCreateTime("./config.yaml"), 10))
+	log.Println("更新时间配置文件成功")
+	restart()
+	time.Sleep(30 * time.Second)
+}
+func restart() {
+	cmd := exec.Command("systemctl", "restart", `clash`)
+	//创建获取命令输出管道
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		fmt.Printf("Error:can not obtain stdout pipe for command:%s\n", err)
 		return
 	}
-	fmt.Printf(strconv.FormatInt(GetFileCreateTime("./config.yaml"), 10))
+	//执行命令
+	if err := cmd.Start(); err != nil {
+		fmt.Println("Error:The command is err,", err)
+		return
+	}
+	//使用带缓冲的读取器
+	outputBuf := bufio.NewReader(stdout)
+	for {
+		//一次获取一行,_ 获取当前行是否被读完
+		output, _, err := outputBuf.ReadLine()
+		if err != nil {
+
+			// 判断是否到文件的结尾了否则出错
+			if err.Error() != "EOF" {
+				fmt.Printf("Error :%s\n", err)
+			}
+			return
+		}
+		fmt.Printf("%s\n", string(output))
+	}
 }
 func main() {
-	url := ""
-	getClash(url)
+	files, _ := rconfig.OpenJson("./config.json")
+	url := files.GetString("clash")
+	getClash(url, true)
 	//files, _ := rconfig.OpenJson("./config.json")
-	//name := files.GetString("host") //key
-	//desc := files.GetInt("test.1.params.0.desc")  //333
-
-	//getProxies(name)
+	name := files.GetString("host") //key
+	getProxies(name)
 }
