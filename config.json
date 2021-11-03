@@ -1,3 +1,5 @@
 {
-  "host": "http://127.0.0.1:9090"
+  "host": "http://127.0.0.1:9090",
+  "clash": "",
+  "yaml": "/home/yanfive/Pictures/clash/config.yaml"
 }

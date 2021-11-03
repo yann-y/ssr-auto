@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"strconv"
 	"sync"
@@ -19,7 +20,7 @@ import (
 	"time"
 )
 
-const filePath = "/home/yanfive/Pictures/clash/config.yaml"
+var filePath = "/home/yanfive/Pictures/clash/config.yaml"
 
 type nodeList struct {
 	Proxies struct {
@@ -192,8 +193,14 @@ func restart() {
 	}
 }
 func main() {
-	files, _ := rconfig.OpenJson("./config.json")
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Println("获取当前运行路径出现错误")
+	}
+	dir = path.Join(dir, "config.json")
+	files, _ := rconfig.OpenJson(dir)
 	url := files.GetString("clash")
+	filePath = files.GetString("yaml")
 	getClash(url, true)
 	//files, _ := rconfig.OpenJson("./config.json")
 	name := files.GetString("host") //key
